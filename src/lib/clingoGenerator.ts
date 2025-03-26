@@ -1,12 +1,38 @@
+export enum Operator {
+	Same = "same",
+	Next = "next",
+	Right = "right",
+	Left = "left",
+}
+
 export type Rule = {
 	leftCategory: string;
 	leftValue: string;
-	operator: string;
+	operator: Operator;
 	rightCategory: string;
 	rightValue: string;
 };
 
-export function generateClingoCode(houseCount: number, rules: Rule[]): string {
+export type DomainMap = {
+	[category: string]: string[];
+};
+
+export function generateClingoCode(houseCount: number, rules: Rule[], domains: DomainMap): string {
+	for (const rule of rules) {
+		if (!domains[rule.leftCategory]) {
+			throw new Error(`Left category "${rule.leftCategory}" is not defined in domains.`);
+		}
+		if (!domains[rule.rightCategory]) {
+			throw new Error(`Right category "${rule.rightCategory}" is not defined in domains.`);
+		}
+		if (!domains[rule.leftCategory].includes(rule.leftValue)) {
+			throw new Error(`Left value "${rule.leftValue}" is not in the domain of "${rule.leftCategory}".`);
+		}
+		if (!domains[rule.rightCategory].includes(rule.rightValue)) {
+			throw new Error(`Right value "${rule.rightValue}" is not in the domain of "${rule.rightCategory}".`);
+		}
+	}
+
 	let code = "";
 
 	// Base definitions.
@@ -15,68 +41,57 @@ export function generateClingoCode(houseCount: number, rules: Rule[]): string {
 
 	// Domain definitions.
 	code += `% Define the domains for each attribute.\n`;
-	code += `nationality(englishman; spaniard; ukrainian; norwegian; japanese).\n`;
-	code += `color(red; green; ivory; yellow; blue).\n`;
-	code += `beverage(coffee; tea; milk; orange_juice; water).\n`;
-	code += `smoke(old_gold; kools; chesterfields; lucky_strike; parliaments).\n`;
-	code += `pet(dog; snails; fox; horse; zebra).\n\n`;
+	for (const [category, values] of Object.entries(domains)) {
+		if (category === "position") continue;
+		code += `${category}(${values.join("; ")}).\n`;
+	}
+	code += "\n";
 
 	// Each attribute is assigned to exactly one house.
 	code += `% Each attribute is assigned to exactly one house.\n`;
-	code += `1 { assign(N, H) : house(H) } 1 :- nationality(N).\n`;
-	code += `1 { assign(C, H) : house(H) } 1 :- color(C).\n`;
-	code += `1 { assign(B, H) : house(H) } 1 :- beverage(B).\n`;
-	code += `1 { assign(S, H) : house(H) } 1 :- smoke(S).\n`;
-	code += `1 { assign(P, H) : house(H) } 1 :- pet(P).\n\n`;
+	for (const category of Object.keys(domains)) {
+		if (category === "position") continue;
+		code += `1 { assign(A, H) : house(H) } 1 :- ${category}(A).\n`;
+	}
+	code += "\n";
 
 	// Each house gets exactly one attribute from each category.
 	code += `% Each house gets exactly one attribute from each category.\n`;
-	code += `:- house(H), #count { N : assign(N, H), nationality(N) } != 1.\n`;
-	code += `:- house(H), #count { C : assign(C, H), color(C) } != 1.\n`;
-	code += `:- house(H), #count { B : assign(B, H), beverage(B) } != 1.\n`;
-	code += `:- house(H), #count { S : assign(S, H), smoke(S) } != 1.\n`;
-	code += `:- house(H), #count { P : assign(P, H), pet(P) } != 1.\n\n`;
-
-	// Process each user-added rule.
-	// Map "drink" to "beverage" to match our domain.
-	const mapCategory = (cat: string): string => (cat === "drink" ? "beverage" : cat);
+	for (const category of Object.keys(domains)) {
+		if (category === "position") continue;
+		code += `:- house(H), #count { X : assign(X, H), ${category}(X) } != 1.\n`;
+	}
+	code += "\n";
 
 	// Helper predicate for neighbor relation.
 	code += `% Define the next_to predicate for adjacency.\n`;
-	code += `\nnext_to(X, Y) :- house(X), house(Y), X = Y + 1.\n`;
+	code += `next_to(X, Y) :- house(X), house(Y), X = Y + 1.\n`;
 	code += `next_to(X, Y) :- house(X), house(Y), X = Y - 1.\n\n`;
 
 	code += `% Process each user-added rule.\n`;
 	for (const rule of rules) {
-		const Lcat = mapCategory(rule.leftCategory);
-		const Rcat = mapCategory(rule.rightCategory);
+		const Lcat = rule.leftCategory;
+		const Rcat = rule.rightCategory;
 		const Lval = rule.leftValue;
 		const Rval = rule.rightValue;
 		const op = rule.operator;
 
-		if (op === "same") {
-			// If one side is a fixed position, output a constraint to force that house.
-			if (rule.leftCategory === "position" && rule.rightCategory === "position") {
-				// Both sides are positions; nothing to enforce.
-			} else if (rule.leftCategory === "position") {
-				// Left side fixes the house number.
-				code += `:- assign(${Rcat}, H), H != ${Lval}.\n`;
-			} else if (rule.rightCategory === "position") {
-				// Right side fixes the house number.
-				code += `:- assign(${Lcat}, H), H != ${Rval}.\n`;
+		if (op === Operator.Same) {
+			if (Lcat === "position" && Rcat === "position") {
+				// Both positions—nothing to enforce.
+			} else if (Lcat === "position") {
+				code += `:- assign(${Rval}, H), H != ${Lval}.\n`;
+			} else if (Rcat === "position") {
+				code += `:- assign(${Lval}, H), H != ${Rval}.\n`;
 			} else {
-				// Neither side is position: enforce both attributes are in the same house.
-				code += `:- assign(${Lcat}, H1), assign(${Rcat}, H2), H1 != H2.\n`;
+				code += `:- assign(${Lval}, H1), assign(${Rval}, H2), H1 != H2.\n`;
 			}
-		} else if (op === "next") {
-			// "next to": the two attributes must be in adjacent houses.
-			code += `:- assign(${Lcat}, H1), assign(${Rcat}, H2), not next_to(H1, H2).\n`;
-		} else if (op === "right") {
-			// "right of": the left attribute is immediately to the right of the right attribute.
-			code += `:- assign(${Lcat}, H1), assign(${Rcat}, H2), H1 != H2 + 1.\n`;
-		} else if (op === "left") {
-			// "left of": the left attribute is immediately to the left of the right attribute.
-			code += `:- assign(${Lcat}, H1), assign(${Rcat}, H2), H1 != H2 - 1.\n`;
+		} else if (op === Operator.Next) {
+			code += `:- assign(${Lval}, H1), assign(${Rval}, H2), not next_to(H1, H2).\n`;
+		} else if (op === Operator.Right) {
+			code += `:- assign(${Lval}, H1), assign(${Rval}, H2), H1 != H2 + 1.\n`;
+		} else if (op === Operator.Left) {
+			code += `:- assign(${Lval}, H1), assign(${Rval}, H2), H1 != H2 - 1.\n`;
 		}
 	}
 
