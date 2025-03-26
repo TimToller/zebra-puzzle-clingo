@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import LZString from "lz-string";
+import { useEffect, useState } from "react";
 import ClingoEditor from "./components/clingo-editor";
 import DomainEditor from "./components/domain-editor";
 import RuleEditor from "./components/rule-editor";
@@ -145,6 +146,43 @@ function App() {
 		position: new Array(houseCount).fill(0).map((_, i) => (i + 1).toString()),
 	};
 
+	const updateSearchParams = () => {
+		if (houseCount === 5 && Object.keys(domainMap).length === 0 && rules.length === 0) {
+			return;
+		}
+
+		const searchParams = new URLSearchParams(window.location.search);
+		const json = JSON.stringify([houseCount, rules, domainMap]);
+
+		const compressed = LZString.compressToEncodedURIComponent(json);
+
+		searchParams.set("s", compressed);
+		window.history.replaceState(null, "", "?" + searchParams.toString());
+	};
+
+	useEffect(() => {
+		updateSearchParams();
+	}, [houseCount, rules, domainMap]);
+
+	useEffect(() => {
+		const searchParams = new URLSearchParams(window.location.search);
+
+		const compressed = searchParams.get("s");
+		if (compressed) {
+			const decompressed = LZString.decompressFromEncodedURIComponent(compressed);
+			if (decompressed) {
+				try {
+					const [dHouseCount, dRules, dDomainMap] = JSON.parse(decompressed);
+					setHouseCount(dHouseCount);
+					setRules(dRules);
+					setDomainMap(dDomainMap);
+				} catch (e) {
+					console.error("Failed to parse state from URL", e);
+				}
+			}
+		}
+	}, []);
+
 	const handleGenerateCode = () => {
 		try {
 			const code = generateClingoCode(houseCount, rules, domainWithPosition);
@@ -182,6 +220,19 @@ function App() {
 		setRules(defaultRules);
 	};
 
+	const reset = () => {
+		setDomainMap({});
+		setHouseCount(5);
+		setRules([]);
+		setClingoCode("");
+		setSolution("");
+
+		const searchParams = new URLSearchParams(window.location.search);
+		searchParams.delete("s");
+
+		window.history.replaceState(null, "", "?" + searchParams.toString());
+	};
+
 	return (
 		<div className="container mx-auto p-8">
 			<Card className="mb-8">
@@ -205,11 +256,20 @@ function App() {
 						{Math.min(...Object.values(domainMap).map((v) => v.length)) < houseCount && (
 							<p className="text-red-500">Warning: The number of houses exceeds the number of values in at least one category.</p>
 						)}
-						<div>
+						<div className="flex gap-4">
 							<Button onClick={loadExampleProblem} className="mb-4">
 								Load Example Problem
 							</Button>
+							<Button onClick={reset} className="mb-4">
+								Reset
+							</Button>
 						</div>
+						<p>
+							The example is from{" "}
+							<a href="https://en.wikipedia.org/wiki/Zebra_Puzzle#Description" target="_blank">
+								here
+							</a>
+						</p>
 						<DomainEditor domains={domainMap} onDomainsChange={setDomainMap} houseCount={houseCount} />
 						<RuleEditor domains={domainWithPosition} rules={rules} onRulesChange={setRules} />
 						<Separator className="my-4" />

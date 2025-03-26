@@ -118,3 +118,10 @@
 		@apply bg-background text-foreground;
 	}
 }
+
+a {
+	@apply text-primary underline-offset-4 transition-colors underline;
+	&:hover {
+		@apply text-primary/20;
+	}
+}
