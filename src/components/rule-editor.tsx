@@ -63,6 +63,9 @@ export default function RuleEditor({ domains, onRulesChange, rules }: InlineRule
 		<div className="flex flex-col gap-2">
 			{rules.map((rule, index) => (
 				<div key={index} className="flex items-center gap-2 border p-2 rounded">
+					<Button variant="destructive" onClick={() => deleteRule(index)}>
+						Delete
+					</Button>
 					{/* Left Category */}
 					<Select value={rule.leftCategory} onValueChange={(val) => updateRule(index, "leftCategory", val)}>
 						<SelectTrigger className="w-32">{rule.leftCategory}</SelectTrigger>
@@ -118,9 +121,6 @@ export default function RuleEditor({ domains, onRulesChange, rules }: InlineRule
 							))}
 						</SelectContent>
 					</Select>
-					<Button variant="destructive" onClick={() => deleteRule(index)}>
-						Delete
-					</Button>
 				</div>
 			))}
 			<div className="flex justify-end">

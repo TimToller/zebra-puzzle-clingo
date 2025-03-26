@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import ClingoEditor from "./components/clingo-editor";
 import DomainEditor from "./components/domain-editor";
 import RuleEditor from "./components/rule-editor";
 import { Label } from "./components/ui/label";
@@ -196,7 +197,7 @@ function App() {
 						<Separator className="my-4" />
 						<div className="flex flex-col gap-2">
 							<Button onClick={handleGenerateCode}>Generate Clingo Code</Button>
-							<textarea readOnly value={clingoCode} className="w-full h-40 p-2 border rounded" />
+							<ClingoEditor code={clingoCode} setCode={setClingoCode} />
 							<Button onClick={handleSolve}>Solve Puzzle</Button>
 							<pre className="p-4 bg-gray-100 rounded">{solution}</pre>
 						</div>
