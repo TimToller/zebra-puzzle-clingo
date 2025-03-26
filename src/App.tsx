@@ -8,6 +8,7 @@ import RuleEditor from "./components/rule-editor";
 import { Label } from "./components/ui/label";
 import { Separator } from "./components/ui/separator";
 import { DomainMap, generateClingoCode, Operator, Rule } from "./lib/clingoGenerator";
+import { runClingo } from "./lib/clingoRunner";
 
 const defaultDomains: DomainMap = {
 	nationality: ["englishman", "spaniard", "ukrainian", "norwegian", "japanese"],
@@ -154,8 +155,25 @@ function App() {
 	};
 
 	// Replace with Clingo integration if available.
-	const handleSolve = () => {
-		setSolution("Solution model goes here (Clingo integration required)");
+	const handleSolve = async () => {
+		runClingo(clingoCode)
+			.then((res) => {
+				if (res.result) {
+					let text = `A solution was found, there are ${res.models.more ? "more" : "no other"} models.`;
+
+					Object.entries(res.result).forEach(([house, values]) => {
+						text += `\nHouse ${house}:\n`;
+						Object.entries(domainMap).forEach(([category, domainElements]) => {
+							const value = domainElements.find((v) => values.includes(v));
+							text += `  ${category}: ${value || "none"}\n`;
+						});
+					});
+					setSolution(text);
+				}
+			})
+			.catch((error) => {
+				setSolution("Error: " + error.message);
+			});
 	};
 
 	const loadExampleProblem = () => {

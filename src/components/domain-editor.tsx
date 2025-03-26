@@ -16,63 +16,36 @@ export default function DomainEditor({ domains, onDomainsChange, houseCount }: D
 
 	const [parseError, setParseError] = useState("");
 
-	const inputSchema = z.object({
-		category: z
-			.string()
-			.trim()
-			.min(1, "Category is required")
-			.refine(
-				(val) => {
-					// Check if category already exists in domains
-					return !Object.keys(domains).includes(val);
-				},
-				{
+	const inputSchema = z
+		.object({
+			category: z
+				.string()
+				.trim()
+				.min(1, "Category is required")
+				.refine((val) => !Object.keys(domains).includes(val), {
 					message: "Category already exists",
-				}
-			)
-			.refine(
-				(val) => {
-					// Check if category is a valid identifier (alphanumeric and underscores)
-					const regex = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-					return regex.test(val);
-				},
-				{
+				})
+				.refine((val) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(val), {
 					message: "Category must be a valid identifier (alphanumeric and underscores)",
-				}
-			),
-		values: z
-			.string()
-			.trim()
-			.min(1, "Values are required")
-			.refine(
-				(val) => {
-					const valuesArray = val.split(",").map((v) => v.trim());
-					const uniqueValues = new Set(valuesArray);
-					return uniqueValues.size === valuesArray.length;
-				},
-				{
+				}),
+			values: z
+				.string()
+				.trim()
+				.min(1, "Values are required")
+				.transform((val) => val.split(",").map((v) => v.trim()))
+				.refine((valArray) => new Set(valArray).size === valArray.length, {
 					message: "Values must be unique",
-				}
-			)
-			.refine(
-				(val) => {
-					const valuesArray = val.split(",").map((v) => v.trim());
-					return valuesArray.length >= houseCount;
-				},
-				{
+				})
+				.refine((valArray) => valArray.length >= houseCount, {
 					message: "Not enough values for the number of houses",
-				}
-			)
-			.refine(
-				(val) => {
-					const valuesArray = val.split(",").map((v) => v.trim());
-					return valuesArray.every((v) => /^[a-zA-Z0-9_]+$/.test(v));
-				},
-				{
+				})
+				.refine((valArray) => (valArray || []).every((v) => /^[a-zA-Z0-9_]+$/.test(v)), {
 					message: "Values must be alphanumeric and can include underscores",
-				}
-			),
-	});
+				}),
+		})
+		.refine((data) => !data.values.includes(data.category), {
+			message: "Category and values cannot be the same",
+		});
 
 	const handleAddDomain = () => {
 		// Validate input
@@ -112,7 +85,13 @@ export default function DomainEditor({ domains, onDomainsChange, houseCount }: D
 	return (
 		<div className="border p-4 rounded mb-4">
 			<h2 className="text-xl font-semibold mb-2">Domain Editor</h2>
-			<div className="flex flex-col gap-2">
+			<form
+				className="flex flex-col gap-2"
+				onSubmit={(e) => {
+					e.stopPropagation();
+					e.preventDefault();
+					handleAddDomain();
+				}}>
 				<div className="flex gap-2 items-center">
 					<Label htmlFor="domainCategory" className="w-32">
 						Category:
@@ -141,9 +120,9 @@ export default function DomainEditor({ domains, onDomainsChange, houseCount }: D
 				</div>
 				<div>{parseError && <p className="text-red-500">{parseError}</p>}</div>
 				<div>
-					<Button onClick={handleAddDomain}>Add Domain</Button>
+					<Button type="submit">Add Domain</Button>
 				</div>
-			</div>
+			</form>
 			<div className="mt-4">
 				<h3 className="font-medium">Current Domains:</h3>
 				{Object.keys(domains).length === 0 && <p>No domains defined.</p>}
